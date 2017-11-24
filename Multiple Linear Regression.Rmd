@@ -1,0 +1,323 @@
+---
+title: "BTRY 4030 - Fall 2017 - Homework 1"
+author: "Bowen Gao(bg453)"
+date: "Due Friday, September 22, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+**Instructions**: 
+
+
+Create your homework solution file by editing the "hw1-2017.Rmd" Rmarkdown file provided. Your solution to this homework assignment should include the relevant R code and output (fit summaries, ANOVA tables and computed statistics, as well as requested plots) in addition to written comments where requested. Do not include output that is not relevant to the question. 
+
+*You may discuss the homework problems and computing issues with other students in the class. However, you must write up your homework solution on your own. In particular, do not share your homework RMarkdown file with other students.*
+
+---
+
+\noindent 1. The file ``cherry.txt'' contains measurements of **diameter** (D, in
+inches), **height** (H, in feet), and **volume** (V, in cubic
+  feet) of a sample of 31 cherry trees. The following commands can be used to read the data into R (although you will need point the **setwd** command to the directory on your computer that contains the data file.).
+
+```{r}
+cherry=read.table("cherry.txt",head=TRUE)
+colnames(cherry)=c("D","H","V")
+```
+
+1a. Use the **pairs** function to construct a scatterplot
+  matrix of the logarithms of D, H and V.
+  
+```{r}
+pairs(log(cherry))
+```
+  
+1b. Use the **cor** function to determine the correlation
+  matrix for the three (logged) variables.
+  
+```{r}
+cor(log(cherry))
+```  
+1c. Use the **lm** function in R to fit the MLR model,
+    $$\ln V = \beta_0 + \beta_1\ln D + \beta_2\ln H + e$$
+  and print out the **summary** of the model fit.
+
+```{r}
+cherry.lm <- lm(log(cherry$V) ~ log(cherry$D) + log(cherry$H))
+summary(cherry.lm)
+```
+1d. Create the design/covariate matrix, $X$, for the model
+  in 1c and verify that the coefficient estimates in
+  the summary ouput are given by the least squares formula:
+  $(X^TX)^{-1}X^Ty$.
+```{r}
+X = matrix(1, ncol = 3, nrow = length(cherry$D))
+X[,2] = log(cherry$D)
+X[,3] = log(cherry$H)
+y = log(cherry$V)
+XtX = t(X)%*%X
+iXtX = solve(XtX)
+beta = iXtX%*%t(X)%*%y
+beta
+```  
+1e. Compute the hat-matrix and use it to calculate the
+  fitted values and residual vector. (Include the relevant R code but
+  don't print out these vectors or the hat matrix.) 
+  Determine the squared correlation between
+  the fitted values and the response vector. What value in the
+  summary output does this number correspond to?
+  
+```{r}
+hat_matrix = X%*%iXtX%*%t(X)
+y_hat = hat_matrix%*%y
+residual_e = y - y_hat
+sq_corr = cor(y, y_hat)^2
+sq_corr
+```
+The squared correlation between the fitted values and the response vector correspond to multiple R-squared in the summary output.
+
+1f. Compute the mean squared error and its square root using
+  the residual vector from 1e. What value in the summary output is
+  equal to the root mean squared error?
+  
+```{r}
+MSE = sum(residual_e^2)/(length(y)-3)
+rMSE = sqrt(MSE)
+rMSE
+```
+The Residual standard error on 28 degrees of freedom in the summary output is equal to the root mean squared error here.
+
+1g. Compute the standard errors for the regression coefficients
+  using the root mean squared error and the design matrix. Verify that
+  your computed values agree with those given in the summary output. 
+  
+```{r}
+se_beta = rMSE*sqrt(diag(iXtX))
+se_beta
+```
+  
+1h. Extract the diagonal elements from the hat-matrix. 
+Identify the observation with the most leverage. Determine the
+  fitted value for this observation.
+  
+```{r}
+diag_elem = diag(hat_matrix)
+max_idx = which.max(diag_elem)
+max_idx
+diag_elem[max_idx]
+y_hat[20]
+```
+
+1i. Refit the MLR model with the observation identified in
+  1h omitted. Use the fitted model to predict the response for the
+  omitted observation. Compare this value to the corresponding
+  prediction using all the data. 
+  
+```{r}
+new_x = X[-20,]
+new_y = y[-20]
+new_cherry.lm = lm(new_y ~ new_x[,2] + new_x[,3])
+y_hat_omitted = X[20,]%*%new_cherry.lm$coefficients
+y_hat_omitted
+y_hat_nomitted = X[20,]%*%cherry.lm$coefficients
+y_hat_nomitted
+```
+
+1j. Use the **anova** function to determine the
+  decomposition of the total (corrected) sum of squares (for the
+  complete data). Verify that
+  the sums of squares given by the **anova** function sum to the
+  total. What happens
+  to the decomposition if the order of the predictors in the model is
+  changed? 
+  
+```{r}
+cherry.anova = anova(cherry.lm)
+cherry.anova
+sum_sq_anova = sum(cherry.anova$`Sum Sq`)
+sum_sq_anova
+sum_sq = sum((y-mean(y))^2)
+sum_sq
+cherry_co.lm = lm(log(cherry$V) ~ log(cherry$H) + log(cherry$D))
+cherry_co.anova = anova(cherry_co.lm)
+cherry_co.anova
+```
+After changing the order of the predicators, we find that the Sum Sq of the indicators are different from those before changing the order. However, the Sum Sq of Residuals and the total of Sum Sq remain the same. This is because in "Type I" ANOVA analysis, testing is done in the order that the variables are specified in the model.
+
+1k. Extract the residual vector (DH say) from the SLR model
+  with y=ln(D) and x=ln(H). Rerun the MLR in 1c with ln(D) replaced by DH. What happens to the ANOVA decomposition if the order of the predictors is changed? 
+  
+```{r}
+cherry_DH.lm = lm(X[,2] ~ X[,3])
+DH = X[,2]-cbind(X[,1],X[3])%*%cherry_DH.lm$coefficients
+cherry_new.lm = lm(y ~ DH + log(cherry$H))
+summary(cherry_new.lm)
+anova(cherry_new.lm)
+cherry_new_co.lm = lm(y ~ log(cherry$H) + DH)
+anova(cherry_new_co.lm)
+```
+The Sum Sq of indicator $ln(H)$ and $DH$ will change after changing the order of predicators. But Sum Sq of Residuals and the total Sum Sq remain the same.
+
+
+1l. Extract the residuals (VH say) $from SLR fit with y=ln(V) and
+  x=ln(H). Construct a scatterplot of VH versus DH and add the
+  regression line. 
+  
+```{r}
+cherry_VH.lm = lm(log(cherry$V) ~ log(cherry$H))
+VH = y - cbind(X[,1],log(cherry$H))%*%cherry_VH.lm$coefficients
+plot(DH, VH)
+VH_DH.lm = lm(VH ~ DH)
+abline(VH_DH.lm$coefficients)
+```
+
+1m. Compare the slope of the regression of
+  VH on DH to the estimated regression coefficients from the MLR
+  in 1c.
+  
+```{r}
+VH_DH.lm$coefficients[2]
+cherry.lm$coefficients
+```
+The slope of $DH$ is larger than the coefficient of $ln(D)$ and smaller than the coefficient of $ln(H)$.
+  
+---
+  
+2a. Consider the matrix:
+$$ A = \left(
+    \begin{array}{ccc}
+      3 & 3 & 0\\
+      1 & 2 & 0\\
+      -4 & 0 & 1
+    \end{array}
+    \right)\,. $$
+
+Show that $\mathbf x^TA\mathbf x = \frac{1}{2}\mathbf x^T(A+A^T)\mathbf x$ for *all* values of $\mathbf x=(x_1,x_2,x_3)^T$. 
+$$
+\mathbf x^TA\mathbf x = (x_1, x_2, x_3)
+    \left(\begin{array}{ccc}
+      3 & 3 & 0\\
+      1 & 2 & 0\\
+      -4 & 0 & 1
+    \end{array}
+    \right)\,\left(\begin{array}{c}x_1\\x_2\\x_3\end{array}\right)\,
+    =(3x_1+x_2-4x_3, 3x_1+2x_2, x_3)\left(\begin{array}{c}x_1\\x_2\\x_3\end{array}\right)\,
+    \\=3x_1^2 + 2_2^2+x_3^2+4x_1x_2-4x_1x_3= (x_1, x_2, x_3)
+    \left(\begin{array}{ccc}
+      3 & 2 & -2\\
+      2 & 2 & 0\\
+      -2 & 0 & 1
+    \end{array}
+    \right)\,\left(\begin{array}{c}x_1\\x_2\\x_3\end{array}\right)\,
+$$
+  $$
+  \because \frac{1}{2}(A+A^T) = \left(\begin{array}{ccc}
+      3 & 2 & -2\\
+      2 & 2 & 0\\
+      -2 & 0 & 1
+    \end{array}
+    \right)\,\\
+    \therefore \frac{1}{2}\mathbf x^T(A+A^T)\mathbf x = \mathbf x^TA\mathbf x 
+  $$
+```{r}
+A = matrix(c(3,3,0,1,2,0,-4,0,1),3)
+A = t(A)
+N = 0.5*(A + t(A))
+N
+```
+
+  
+2b. Show that this is true for any square matrix $A$. 
+For any $A$
+ $$
+ \because \mathbf x^TA\mathbf x = \sum_{i,j}a_{ij}x_ix_j\,\,
+  and \, \because \frac{1}{2}(A+A^T)_{\{ij\}} = \frac{1}{2}(a_{ij}+a_{ji}) \\
+ \therefore 
+ \frac{1}{2}\mathbf x^T(A+A^T)\mathbf x = \sum_{i,j}\frac{1}{2}(a_{ij}+a_{ji})x_ix_j = \sum_{i,j}a_{ij}x_ix_j = \mathbf x^TA\mathbf x\\
+ $$
+  
+---  
+  
+ 
+3a.  Let $D$ be a $n \times n$ diagonal matrix with diagonal elements $d_i$ and $A = A_{ij}$ be a square matrix of dimension $n \times n$. Show that $DA$ corresponds to multiplying the $i$th row of $A$ by $d_i$ and that $AD$ is the corresponding operation on columns.
+It will help to write down an expression for $(AD)_{ij}$ and then explain why this correspondence holds. 
+
+Since $(DA)_{ij} = d_i a_{ij}$, it means that we multiply every element in the $i$th row of $A$ by $d_i$. Similarly, $(AD)_{ij}$ is equal to $d_ja_{ij}$, which corresponds to multiplying every element in the $j$th column by $d_j$.
+
+$$
+DA = \left(\begin{array}{ccc}
+      d_1 &   &\\
+       & ... & \\
+       &  &  d_n
+    \end{array}
+    \right)\,\left(\begin{array}{c}
+    \mathbf a_1^T\\ ... \\\mathbf a_n^T\end{array}\right) = \left(\begin{array}{c}
+    d_1\mathbf a_1^T\\ ... \\d_n\mathbf a_n^T\end{array}\right)\,
+\\ \\
+AD = (\mathbf a_1,..., \mathbf a_n)\left(\begin{array}{ccc}
+      d_1 &   &\\
+       & ... & \\
+       &  &  d_n
+    \end{array}
+    \right)\,= (d_1\mathbf a_1,...,d_n\mathbf a_n)
+$$
+
+3b. Let $A$ and $B$ be $p \times n$ and $q \times n$ matrices with rows $(\mathbf a_1,\ldots,\mathbf a_n)$ and $(\mathbf b_1,\ldots,\mathbf b_n)$ respectively (by default the vector $\mathbf a_i$ is thought of as column when taken by itself, even if it is from a $row$ of $A$).
+
+Show that 
+$$
+A B^T = \sum_{i=1}^n \mathbf a_i \mathbf b_i^T
+$$
+by expressing the elements $(AB^T)_{ij}$ both ways. 
+
+$$
+\because (AB^T)_{ij} = (a_{i1},...,a_{in})\left(\begin{array}{c}b_{1j}\\.\\.\\.\\b_{nj}\end{array}\right)\,= \sum_{k=1}^{n}a_{ik}·b_{kj} \\
+and \because \left(\sum_{k=1}^n \mathbf a_k \mathbf b_k^T\right)_{ij} = \sum_{k=1}^n (\mathbf a_k \mathbf b_k^T)_{ij}=\sum_{k=1}^n \left(\left(\begin{array}{c}a_{1k}\\.\\.\\.\\a_{pk}\end{array}\right)\,(b_{k1},...,a_{kq})\right)_{ij} = \sum_{k=1}^n
+\left(\begin{array}{ccc}
+      a_{1k}b_{k1} &   &\\
+       & ... & \\
+       &  &  a_{pk}b_{kq}
+    \end{array}
+    \right)_{ij} = \sum_{k=1}^na_{ik}·b_{kj} \\
+    \therefore A B^T = \sum_{i=1}^n \mathbf a_i \mathbf b_i^T.
+$$
+
+3c. We claimed in class that for a square symmetric matrix $A$ with eigenvector/eigenvalue pairs $(\mathbf e_i, d_i)$ we can write $A = EDE^T$, where $D$ is a diagonal matrix with diagonal entries $d_i$ and $E$ is a matrix with columns given by the the $\mathbf e_i$. 
+
+Show that this is true by
+   i) Showing that $AE = ED$
+   ii) Observing that $EE^T = I$, produce $A = EDE^T$.
+
+i)
+According to the definition, $A \mathbf e_i = d_i \mathbf e_i$. Thus,
+$$
+AE = (A\mathbf e_1,...,A\mathbf e_n) = (d_1 \mathbf e_1, ..., d_n \mathbf e_n)=ED
+$$
+ii)
+$$
+ E^TE = \left(\begin{array}{c}\mathbf e_{1}^T\\.\\.\\.\\\mathbf e_{n}^T\end{array}\right)\,(\mathbf e_{1},...,\mathbf e_{n}) = \left(\begin{array}{ccc}
+      \mathbf e_{1}^T\mathbf e_{1} &   &\\
+       & ... & \\
+       &  &  \mathbf e_{n}^T\mathbf e_{n}
+    \end{array}
+    \right)=\left(\begin{array}{ccc}
+      1 &   &\\
+       & ... & \\
+       &  &  1
+    \end{array}
+    \right) = I.
+$$
+The above equation holds because $||\mathbf e_{i}^T\mathbf e_{i}||=1$,i.e. $\mathbf e_{i}^T\mathbf e_{i} = 1$ and $\mathbf e_{i}^T \perp \mathbf e_{j}$, i.e. $e_{i}^T\mathbf e_{j}=0$. Therefore, since $E^TE=E^{-1}E=I$, $E^{-1}=E^T$ and $EE^T = I$.
+Thus, $AEE^T = EDE^T=A$.
+
+
+3d. Using the above results, show that  we can write
+$$
+\sum_{i=1}^n d_i \mathbf e_i \mathbf e_i^T = EDE^T
+$$
+According to the result in (3a), we know that $ED = (d_1\mathbf e_{1},...,d_n\mathbf e_{n})$. From the results in (3b), we know that $(ED)E^T=\sum_{i=1}^n d_i \mathbf e_i \mathbf e_i^T$.
+
+3e. Hence show that we can express tr$(A) = \sum d_i$. 
+$$
+tr(A) = tr(EDE^T)=tr(DE^TE)=tr(D)= \sum d_i
+$$
+

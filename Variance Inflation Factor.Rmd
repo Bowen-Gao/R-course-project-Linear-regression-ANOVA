@@ -1,0 +1,314 @@
+---
+title: "BTRY 4030 - Fall 2017 - Homework 2"
+author: "Bowen Gao (bg453)"
+date: "Due Friday, October 6, 2017"
+output: pdf_document
+---
+**Instructions**: 
+
+
+Create your homework solution file by editing the "hw2-2016.Rmd" Rmarkdown file provided. Your solution to this homework assignment should include the relevant R code and output (fit summaries, ANOVA tables and computed statistics, as well as requested plots) in addition to written comments where requested. Do not include output that is not relevant to the question. 
+
+*You may discuss the homework problems and computing issues with other students in the class. However, you must write up your homework solution on your own. In particular, do not share your homework RMarkdown file with other students.*
+
+---
+
+\noindent 1.
+
+The data that we examine here is obtained from measurements of 26 American chestnut trees (nearly eradicated in the early 1900's by a Chestnut blight imported along with Chinese chestnut trees). 
+
+In each case, the age of the tree was recorded as well as the diameter at breast height (dbh) of the tree. The data can be obtained from 
+```{r,echo=TRUE}
+chsnut = read.table('chsnut.dat',head=TRUE)
+plot(chsnut)
+```
+
+1a. Observing the appearance of some curvature in the model, we consider a model with a quadratic term:
+$$
+DBH = \beta_0 + \beta_1 AGE + \beta_2 AGE^2 + \epsilon
+$$
+To fit this model, you will need to create another column of the data giving $AGE^2$. Do so,  extract the coefficients, their standard errors and the root mean squared error and display these values.
+```{r}
+age_sqr = (chsnut$Age)^2
+dbh.lm = lm(chsnut$DBH ~ chsnut$Age + age_sqr)
+summary(dbh.lm)
+print('Coefficients:')
+dbh.lm$coefficients
+print ('Standard errors:')
+sqrt(diag(vcov(dbh.lm)))
+print('Root mean squared error:')
+sqrt(sum(dbh.lm$residuals^2)/(length(chsnut$DBH)-3))
+```
+
+1b. Calculate (manually) the R-squared value for this model.
+```{r}
+X = matrix(1, ncol = 3, nrow = length(chsnut$Age))
+X[,2] = chsnut$Age
+X[,3] = age_sqr
+XtX = t(X)%*%X
+iXtX = solve(XtX)
+y = chsnut$DBH
+hat_matrix = X%*%iXtX%*%t(X)
+y_hat = hat_matrix%*%y
+residual_e = y - y_hat
+R_squared = cor(y, y_hat)^2
+R_squared
+```
+
+1c. Plot the three columns of the data against each other. You'll notice that the covariates fall on a line when plotted against each other. Why is the model still identifiable?
+```{r}
+plot(chsnut$Age, chsnut$DBH)
+plot(age_sqr, chsnut$DBH)
+plot(chsnut$Age, age_sqr)
+```
+The model is still identifiable by increasing the explanatory power of one covariate(AGE) and decreasing the other(AGE^2).
+
+1d. Calculate the variance inflation factor for each coefficient. Verify that you get the same answer as the **vif** function in the **car** package.
+```{r}
+x1.lm = lm(X[,1] ~ 0 + chsnut$Age + age_sqr)
+x2.lm = lm(X[,2] ~ age_sqr)
+x3.lm = lm(X[,3] ~ chsnut$Age)
+vifc = 1/(1-summary(x1.lm)$r.squared)
+vif1 = 1/(1-summary(x2.lm)$r.squared)
+vif2 = 1/(1-summary(x3.lm)$r.squared)
+vifc
+vif1
+vif2
+library(car)
+vif(dbh.lm)
+```
+
+1e. Estimate the covariance of the coefficients.
+```{r}
+vcov(dbh.lm)
+```
+
+
+1f. Obtain leverage and cooks distance values for these data and display them using the **dotchart** function. Which points are most influential?
+```{r}
+leverage = diag(hat_matrix)
+cook_D = cooks.distance(dbh.lm)
+dotchart(cook_D, main = "Cook's Distance")
+dotchart(leverage, main = "Leverage")
+```
+According to Cook's Distance, the 23rd observation is the most influential. According to the leverage, point 26 is the most influential.
+
+1g. It is common to center values of a transformation. In this case, define a new column
+$$
+cAGE^2 = (AGE - \overline{AGE})^2
+$$
+that first removes the mean from $AGE$ and then takes the square. Fit the model
+$$
+DBH = \beta_0 + \beta_1 AGE + \beta_2 cAGE^2 + \epsilon
+$$
+```{r}
+cAGE = chsnut$Age - mean(chsnut$Age)
+cAGE_sqr = cAGE^2
+dbh_new.lm = lm(chsnut$DBH ~ chsnut$Age + cAGE_sqr)
+```
+
+1g.i) Have the coefficients changed?
+```{r}
+coefficients(dbh.lm)
+coefficients(dbh_new.lm)
+```
+$\hat{\beta}_0$ and $\hat{\beta}_1$ changed but $\hat{\beta}_2$ was unchanged.
+
+1g.ii) Have the predictions changed?
+
+```{r}
+X_new = X
+X_new[,3] = cAGE_sqr
+y_hat_new = X_new %*% coefficients(dbh_new.lm)
+```
+The predictions remain unchanged.
+    
+1g.iii) What is the correlation between $\hat{\beta}_1$ and $\hat{\beta}_2$ in the new model?
+
+```{r}
+cov_mat_new = vcov(dbh_new.lm)
+cov_mat_new
+corr = cov_mat_new[2,3]/sqrt(cov_mat_new[2,2]*cov_mat_new[3,3])
+corr
+```
+Their correlation is -0.043.
+
+1g.iv) How does the variance of the new $\hat{\beta}_1$ compare to the minimum possible variance calculated from the VIFs?
+
+```{r}
+new_var_beta1hat = cov_mat_new[2,2]
+min_var_beta1hat = vcov(dbh.lm)[2,2]/vif1
+new_var_beta1hat
+min_var_beta1hat
+```
+
+The variance of the new $\hat{\beta}_1$ is only a little bit larger than the minimum possible variance. They are approximately the same.
+
+1g.v) Why is this form of the model attractive?
+
+Because this form of model eliminates the multicolinearity between AGE and AGE^2 and thus makes the variance of $\hat{\beta}_1$ as small as possible.
+
+---
+
+\noindent 2. This question will perform a simulation based on the model above. Here we will see in simulation that the way we quantify uncertainty really is reasonable.
+
+ 2a. Create 1000 new data sets each with the values of $AGE$ and $AGE^2$ using the coefficients and residual standard error estimated in Question 1 to produce the values in $y$.  On each data set, conduct an linear regression and record the estimated $\hat{\beta}$ its standard error, and $\hat{\sigma}$.
+```{r}
+error_mat = matrix(rnorm(26*1000, mean = 0, sd = summary(dbh.lm)$sigma), 26, 1000)
+y_mat = matrix(rep(X%*%dbh.lm$coefficients, 1000), ncol = 1000) + error_mat
+result_mat = matrix(ncol = 7, nrow = 1000)
+```
+
+```{r}
+for (i in 1:1000) {
+  reg_1000.lm = lm(y_mat[,i] ~ X[,2] + X[,3])
+  result_mat[i,1:3] = reg_1000.lm$coefficients
+  result_mat[i,4:6] = sqrt(diag(vcov(reg_1000.lm)))
+  result_mat[i,7] = summary(reg_1000.lm)$sigma
+}
+```
+
+
+ 2b. Produce a scatter plot of the $\hat{\beta}_1$ and $\hat{\beta}_2$ values.  Report their covariance. Does it match the value you calculated in Question 1? The scatter plot of $AGE$ and $AGE^2$ shows a curved relationship, does this occur in the scatter plot of their coefficients?
+```{r}
+plot(result_mat[,2], result_mat[,3], xlab = "betahat1", ylab = "betahat2")
+cov(result_mat[,2], result_mat[,3])
+vcov(dbh.lm)[2,3]
+```
+Their covariance matches the result in Q1. The relationship between $\hat{\beta}_1$ and $\hat{\beta}_2$ seems to be negatively linear.
+
+ 2c. Construct a histogram of the 1000 $t$-statistics,
+  $$
+  T_i = \frac{ \hat{\beta}_{1i} - \beta_1 }{\mbox{se}(\hat{\beta}_1)}
+  $$
+  where $\beta_1$ is the coefficient for height. Overlay a t-density with the appropriate degrees of
+freedom.
+```{r}
+T_stats = (result_mat[,2] - dbh.lm$coefficients[2])/sqrt(vcov(dbh.lm)[2,2])
+hist(T_stats, freq = F, xlim = range(-4, 4))
+x_dot = seq(-6, 4, 0.01)
+lines(x_dot, dt(x_dot, df = 23))
+```
+
+
+2d. Use the qqplot function to construct a QQ plot of the N simulated t-statistics and add a line through
+the origin with unit slope.
+```{r}
+qqplot(rt(1000, df = 23), T_stats)
+abline(0,1)
+```
+
+
+2e. Construct a histogram of the N chi-squared statistics of the form
+$$
+\chi^2 = f \frac{\hat{\sigma}^2_i}{\sigma^2}
+$$
+where $\sigma^2$ is the variance used to generate your errors, and f is the error degrees of freedom. Overlay a chi-squared density with f degrees of
+freedom.
+```{r}
+Chi_stats = 23*result_mat[,7]^2/(summary(dbh.lm)$sigma)^2
+hist(Chi_stats, freq = F, xlim = range(0:60))
+x_dot = seq(0, 60, 0.01)
+lines(x_dot, dchisq(x_dot, df = 23))
+```
+
+2f. Report the mean and variance of the chi-square statistics and comment briefly on their values. Are they
+(approximately) what they should be?
+```{r}
+mean(Chi_stats)
+var(Chi_stats)
+```
+The mean of chi-square statistics should be the degree of freedom, which is 23 here. And the variance of chi-square statistics should be twice the degree of freedom, which is 46 here. So the result are approximately what they should be.
+---
+
+3a. Suppose that $y$ has mean $(4.2,3.9,-2.5)^T$ and covariance
+$$
+   \Sigma=\left(
+      \begin{array}{ccc}
+        9.1 & 1.2 & -4.3\\
+        1.2 & 25.7 & -2.4\\
+        -4.3 & -2.4 & 13.6
+      \end{array} \right)
+$$
+determine the mean and variance of $x = Ay + b$ for
+$$ A=\left(
+      \begin{array}{ccc}
+        1/3 & 1/3 & 1/3\\
+        1/2 & 1/2 & -1
+      \end{array} \right) $$
+  and $b=(-2.7,4.5)^T.$
+
+```{r}
+A = matrix(c(1/3, 1/3, 1/3,1/2, 1/2 , -1), ncol = 3)
+Sigma = matrix(c(9.1 , 1.2 , -4.3,
+        1.2 , 25.7 , -2.4,
+        -4.3 , -2.4 , 13.6), ncol = 3)
+Sigma_new = A %*% Sigma %*% t(A)
+mu = matrix(c(4.2,3.9,-2.5), ncol = 1)
+b = matrix(c(-2.7,4.5), ncol = 1)
+Mean_new = A%*%mu + b
+Mean_new
+Sigma_new
+```
+
+
+3b. We've stated in class that if $\mathbf x$ has variance $\Sigma$ then $A \mathbf x$ has variance $A \Sigma A^T$. Show that this is the case by explicitly calculating the covariance of the $i$ and $j$th entries of $A \mathbf x$.
+
+It will help to know that
+\begin{align*}
+cov( a_1 x_1 + a_2 x_2, b_1 x_1 + b_2 x_2) & = E[ a_1 x_1 + a_2 x_2 - E(a_1 x_1 + a_2 x_2)][b_1 x_1 + b_2 x_2 - E(b_1 x_1 + b_2 x_2)] \\
+& = E[ a_1( x_1 - Ex_1) + a_2(x_2 - Ex_2)][ b_1( x_1 - Ex_1) + b_2(x_2 - Ex_2)] \\
+& = a_1 b_1 E(x_1 - Ex_1)^2 + a_2 b_2 E(x_2 - Ex_2)^2 + (a_1 b_2 + b_2 a_1) E(x_1-Ex_1)(x_2-Ex_2) \\
+& = a_1 b_1 var(x_1) + a_2 b_2 var(x_2) + a_1 b_2 cov(x_1,x_2) + a_2 b_1 cov(x_2,x_1)
+\end{align*}
+
+
+3c. Use the result above to find the variance of $\hat{\beta}_0 + 40 \hat{\beta}_1 + 1600 \hat{\beta}_2$ (from your first model). This is the variability of the prediction made for a 40-year old tree. 
+
+```{r}
+dbh_varm = vcov(dbh.lm)
+result_var_40 = dbh_varm[1,1] + 1600*dbh_varm[2,2] +1600^2*dbh_varm[3,3] + 
+  80*dbh_varm[1,2] + 3200*dbh_varm[1,3] + 40*1600*dbh_varm[2,3]
+result_var_40
+```
+
+
+3d.  Compare the prediction for a 50 year old tree to a 40 year old tree. Is it reasonable to expect trees to get smaller as they age?  Derive the variability of the difference in these predictions -- does it look like there is statistical evidence that a 50 year old tree would be smaller than a 40 year old?
+
+```{r}
+x_50 = matrix(c(1, 50, 2500), nrow = 1)
+x_40 = matrix(c(1, 40, 1600), nrow = 1)
+y_50 = x_50 %*% coefficients(dbh.lm)
+y_40 = x_40 %*% coefficients(dbh.lm)
+y_50
+y_40
+```
+The curve of our linear model is a porabola. The diameter at breast height will first increase and then decrease as the trees age.
+
+```{r}
+result2 = 100*dbh_varm[2,2] +810000*dbh_varm[3,3] + 2*9000*dbh_varm[2,3]
+result2
+```
+The variance is as follows:
+$$
+Var = Var(10 \hat{\beta}_1 + 900\hat{\beta}_1) = 100Var(\hat{\beta}_1)+81000\hat{\beta}_2+18000Cov(\hat{\beta}_1,\hat{\beta}_2)
+= 0.5352994
+$$
+
+3 bonus.  Is there any age at which there is statistical evidence to support the idea that trees shrink with age?  Note that this question asks about statistical quantities; it is always problematic to make conclusions about a model beyond the range of the covariates. 
+
+
+
+4a. We have seen that our residuals $\hat{e}$ is uncorrelated with the predicted values $\hat{y}$; show that $\hat{e}$ is also uncorrelated with each column of $X$.
+
+
+
+4b. Hence show that our estimate of the variance $\hat{\sigma}^2$ is uncorrelated with $\hat{\beta}$, confirming the plots in Question 2. 
+
+4c. Show that the correlation between $\mathbf e$ and $\mathbf y$ is $(1-R^2)^{1/2}$ and that the slope of the best-fit line to predict $\mathbf e$ from $\mathbf y$ is $1-R^2$.  What does this suggest about plotting $\mathbf e$ versus $\mathbf y$ instead of versus $\hat{\mathbf y}$?  Produce both plots for your model from Question 1. 
+
+```{r}
+plot(y, residual_e)
+plot(y_hat, residual_e)
+```
+This suggests that $\mathbf e$ is linearly related $\mathbf y$ but $\hat{\mathbf y}$ doesn't have this relationship.

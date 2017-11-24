@@ -1,0 +1,200 @@
+---
+title: "BTRY 4030 - Fall 2017 - Homework 3"
+author: "Bowen Gao (bg453)"
+date: "Due Friday, November 3, 2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+**Instructions**: 
+
+
+Create your homework solution file by editing the "hw3-2016.Rmd" Rmarkdown file provided. Your solution to this homework assignment should include the relevant R code and output (fit summaries, ANOVA tables and computed statistics, as well as requested plots) in addition to written comments where requested. Do not include output that is not relevant to the question. 
+
+*You may discuss the homework problems and computing issues with other students in the class. However, you must write up your homework solution on your own. In particular, do not share your homework RMarkdown file with other students.*
+
+---
+## Question 1
+Here we will repeat parts 4 through 8 from the Midterm. These have been slightly reworded and re-ordered to make the intention clearer. 
+
+We will now also consider $x_2$. Using both categorical ($x_1$) and continuous ($x_2$) covariates often referred to as the *Analysis of Covariance (ANCOVA)*, even if Giles thinks it's all just part of linear regression.
+
+For this, we will write the average value of $x_2$ among subjects with $x_1 = 0$ to be $\bar{x}_{2,0}$ and among subjects with $x_1 = 1$ to be $\bar{x}_{2,1}$ and  write $\tilde{x}_2$ to be $x_2$ with the group mean subtracted:
+$$
+\tilde{x}_{i2} = \left\{ \begin{array}{cl} x_{i2} - \bar{x}_{2,0} & \mbox{if } x_{i1} = 0 \\
+x_{i2} - \bar{x}_{2,1} & \mbox{if } x_{i1} = 1 \end{array} \right. = (I-H_1) \mathbf x_2
+$$
+and we will set $X_2 = [\mathbf 1, \mathbf x_1, \tilde{\mathbf x}_2]$.
+
+
+a. Show that $\tilde{\mathbf x}_2$ can be written as $\mathbf x_2 - \alpha_1 \mathbf 1 - \alpha_2 \mathbf x_1$. What are $\alpha_1$ and $\alpha_2$? You may find earlier questions useful.
+
+
+
+
+b. Write out $X_2^T X_2$ for this new model. Show that your estimates $\hat{\beta}_0$ and $\hat{\beta}_1$ are unchanged from Question 2 in the midterm.
+
+    If we are interested in $\beta_1$, was there any point to adding $x_2$?
+
+
+
+d. By writing out the prediction equation $\hat{\beta}_0 + \hat{\beta}_1 x_1 + \hat{\beta}_2 \tilde{x}_2$ in terms of $x_2 = \tilde{x}_2 + \alpha_1 \mathbf 1 + \alpha_2 \mathbf x_1$, find $\hat{\beta}_1^*$, the estimate of $\hat{\beta}_1$ in a model where we used $X_2^* = [\mathbf 1,\mathbf x_1,\mathbf x_2]$ instead of $X$.
+
+    Why has $\hat{\beta}_2$ not changed? What is the variance of $\hat{\beta}_1^*$?
+
+
+c. Show that the variance of $\hat{\beta}_1^*$ obtained above is equal to the variance pf $\hat{\beta}_1$ times the VIF for $\mathbf x_2$.  The following will be helpful:
+$$
+\tilde{\mathbf x}_2^T H_1 C H_1 \tilde{\mathbf x}_2 = n_0 (\bar{x}_{2,0} - \bar{x}_2)^2 + n_1 (\bar{x}_{2,1}-\bar{x}_2)^2 = \frac{n}{n_0 n_1}(\bar{x}_{2,1} - \bar{x}_{2,0})^2
+$$
+
+
+
+e. There is a concern that the slope on $x_2$ might be different between the $x_1 = 1$ group and the $x_1 = 0$ group. For this reason, the researcher considers adding an interaction term to produce a design matrix $X = [\mathbf 1, \mathbf x_1, \tilde{\mathbf x}_2, \mathbf x_1 \tilde{\mathbf x}_2]$ where the last column is the *element-wise* product of $x_1$ and $\tilde{x}_2$.
+
+Define a sum of squares to measure the total contribution of $\tilde{x}_2$ to the model in this case.
+
+
+**Bonus** The paper "A Two-State Algorithm for Fairness-aware Machine Learning" by Junpei Komiyama and Hajime Shimao appeared on ArXiv on October 15 this year -- Giles read it during the midterm.  See https://arxiv.org/abs/1710.04924, if you are interested. 
+
+Recently, there has been considerable interest in the possibility that machine learning can exacerbate social biases, with examples including face recognition that performs much worse on african americans and evidence that tools used to predict re-offending in parol hearings giving worse scores to disadvantaged groups. 
+
+A particular problem is that a tool does not have to explicitly use a *protected value* like sex or race or age in order to discriminate. It could use something correlated like zip code.  One notion of fairness  in these circumstances is that the *average* prediction in classes of a protected value should be the same -- men and women should, on average, be treated as having the same probability of committing a crime. 
+
+(There are many notions of fairness and this is a topic of very current debate in machine learning.)
+
+Komiyama and Shimao consider using linear regression as a prediction tool in a situation where you have *protected variables* $Z$,  useful covariates $X$ and a response to predict $\mathbf y$. They suggest the following
+   1.  Regress each column of $X$ on $Z$ and take the residuals to get $\tilde{X}$
+   2.  Now predict $\mathbf y$ using $\tilde{X}$
+
+We will look at this in the context of the questions above. Here we think of $x_1$ as a prodcted variable, and $x_2$ as something we want to use to predict. $\tilde{\mathbf x}_2$ is the residual after regressing $\mathbf x_2$ on $\mathbf x_1$.  
+
+Consider using the linear model
+$$
+\mathbf y = \beta_0 \mathbf 1 + \beta_1 \tilde{\mathbf x}_2 + \mathbf \epsilon
+$$
+and show that the average of the fitted values when $x_1 = 0$ is the same as the average of the fitted values when $x_1 = 1$. 
+
+Can you generalize this to using a matrix of protected values $Z$ and a matrix of covariates $X$?
+
+
+## Question 2
+
+Here we will repeat the analysis above but more generally, with the idea of getting specific about the interpretation of a sequential ANOVA test.  
+
+We know that the sums of squares for each covariate is unchanged when the covariates are orthogonal. When they aren't, we need to ask "What is the null hypothesis for this test?"
+
+We describe the test as being "the additional effect of $\mathbf x_j$ after controlling for $X_{j-1}$", but what does that mean, mathematically?
+
+To do this, we'll break up the covariate matrix $X = [X_{j-1}, \ \bar{X}_j]$ where $\bar{X}_j = [\mathbf x_j,\ldots,\mathbf x_p]$ and similarly, the coefficient vector will be broken into $\mathbf \beta = (\mathbf \beta_{j-1}^T,\bar{\mathbf \beta}_j^T)^T$ so that we can write the linear regression model as
+$$
+\mathbf y = X_{j-1} \mathbf \beta_{j-1} + \bar{X}_j \bar{\mathbf \beta}_j + \mathbf e.
+$$
+We will **not** assume that $X_j$ is orthogonal to $\bar{X}_j$.  Note that this can be done for any choice of $j \in \{1,\ldots,p\}$.
+
+
+a. Consider regressing $\mathbf y$ on only $X_{j-1}$. Give an expression for the  estimated $\hat{\mathbf \beta}_{j-1}$. 
+
+b. Show the fitted values (written in terms of true coefficients and errors) from the full regression can be re-written using the fitted values from Part 2a. and the matrix of residuals $\bar{R}_j$ obtained from regressing each column of $\bar{X}_j$ on $X_{j-1}$.
+
+c. Show that the sums of squares $\mathbf y^T(H-H_{j-1})\mathbf y$ for $\bar{X}_j|X_{j-1}$ is the same if you replace $\bar{X}_j$ with $\bar{R}_j$ (Why must $H\mathbf y$ be the same in both cases?)
+
+d. Within the sequential test for $\mathbf x_j|X_{j-1}$ show that the sum of squares $\mathbf y^T(H_j-H_{j-1})\mathbf y$ the the same whether you use the original $X$ or $X^* = [X_{j-1}, (I-H_{j-1})\mathbf x_j,(I-H_j)\bar{X}_{j+1}]$.
+
+e. Show that, when using $X^*$ (with corresponding coefficients $\mathbf \beta^*$, the sum of squares $\mathbf y^T(H_j-H_{j-1})\mathbf y$ is only affected by the true value of $\beta_j$.
+
+f. Hence give a detailed interpretation of the meaning of rejecting the $j$th sequential test.
+
+
+
+
+
+## Question 3
+
+Here we will illustrate the results from Question 1 with a real world data set. We will use the study of mortality in 55 US cities as it is influenced by pollutants NOX (nitrous oxide) and SO2 (sulfur dioxide), while controlling weather (PRECIP) and sociological variables (EDUC and NONWHITE) that appeared on the midterm. In this case we will be interested in the sequential test for EDUC with the covariates taken in the order in the data set.
+
+You can find the data in `airpollution.csv` on CMS.
+
+
+```{r}
+library(readr)
+airpollution <- read_csv("C:/Users/gaobowen39/Desktop/hw3/airpollution.csv")
+```
+
+
+a.  Create a new data set (referred to $X^*$ below) in which NONWHITE, NOX and SO2 are replaced with the residuals after regressing each of them on PRECIP and EDUC.
+
+
+airpollution = read.csv2('C:/Users/gaobowen39/Desktop/hw3/airpollution.csv', header = TRUE, sep = ',')
+
+
+```{r}
+Nowhite.lm = lm(airpollution$NONWHITE ~ airpollution$PRECIP + airpollution$EDUC)
+NOX.lm = lm(airpollution$NOX ~ airpollution$PRECIP + airpollution$EDUC)
+SO2.lm = lm(airpollution$SO2 ~ airpollution$PRECIP + airpollution$EDUC)
+res_Nowhite = Nowhite.lm$residuals
+res_NOX = NOX.lm$residuals
+res_SO2 = SO2.lm$residuals
+Xstar = matrix(ncol = 6, nrow = 55)
+Xstar[,1] = 1
+Xstar[,2] = airpollution$PRECIP
+Xstar[,3] = airpollution$EDUC
+Xstar[,4] = res_Nowhite
+Xstar[,5] = res_NOX
+Xstar[,6] = res_SO2
+X = Xstar
+X[,4] = airpollution$NONWHITE
+X[,5] = airpollution$NOX
+X[,6] = airpollution$SO2
+```
+
+b. Show that when producing a model to predict MORT with either the original covariates or the new covariates, you get the same predicted values  (use the maximum absolute difference in predictions to show this).
+
+
+```{r}
+original.lm = lm(airpollution$MORT ~ airpollution$PRECIP + airpollution$EDUC 
+                 + airpollution$NONWHITE + airpollution$NOX + airpollution$SO2)
+new.lm = lm(airpollution$MORT ~ airpollution$PRECIP + airpollution$EDUC)
+fitted_y_ori = X%*%original.lm$coefficients
+fitted_y_new = X[,1:3]%*%new.lm$coefficients
+y_predicted = fitted_y_new + Xstar[,4:6]%*%original.lm$coefficients[4:6]
+```
+
+c. Add SO2 to MORT (this increases the coefficient of SO2 in the model by 1) and obtain a sequential ANOVA table (using the function `anova`) using the new response. Show that this changes the sum of squares for EDUC when using the original data.
+
+```{r}
+original_so2.lm = lm(airpollution$MORT + airpollution$SO2 ~ airpollution$PRECIP 
+                     + airpollution$EDUC + airpollution$NONWHITE 
+                     + airpollution$NOX + airpollution$SO2)
+anova(original_so2.lm)
+anova(original.lm)
+```
+According to the ANOVA table, the Sum Sq of EDUC changes from 16288 to 85566 after adding SO2 to MORT.
+
+d. Do the same thing using the new data set $X^*$ and observe that the sum of squares for EDUC does not change.
+
+```{r}
+new_so2.lm = lm(airpollution$MORT + Xstar[,6] ~ airpollution$PRECIP 
+                + airpollution$EDUC + Xstar[,4] + Xstar[,5] + Xstar[,6])
+anova(new_so2.lm)
+anova(new.lm)
+```
+According to the ANOVA table, the Sum Sq of EDUC is 16288 and it does not change after adding SO2 to MORT.
+
+e. What happens if you add EDUC to MORT (ie, make its coefficient larger) instead? Are there differences between the two data sets? Why?
+
+```{r}
+original_educ.lm = lm(airpollution$MORT + airpollution$EDUC ~ airpollution$PRECIP 
+                      + airpollution$EDUC + airpollution$NONWHITE 
+                      + airpollution$NOX + airpollution$SO2)
+anova(original_educ.lm)
+anova(original.lm)
+new_educ.lm = lm(airpollution$MORT + airpollution$EDUC ~ airpollution$PRECIP 
+                 + airpollution$EDUC + Xstar[,4] + Xstar[,5] + Xstar[,6])
+anova(new_educ.lm)
+anova(new.lm)
+```
+The Sum Sq of EDUC will be different before and after adding EDUC. But the results from two different datasets are the same. This is because in sequantial ANOVA, the covariates after EDUC will not affect its Sum Sq.
+
+
+

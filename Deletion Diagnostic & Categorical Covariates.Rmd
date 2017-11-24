@@ -1,0 +1,225 @@
+---
+title: "BTRY 4030 - Fall 2017 - Homework 4"
+author: "Put Your Name and NetID Here"
+date: "Due Friday, November 17, 2017"
+output: pdf_document
+---
+**Instructions**: 
+
+
+Create your homework solution file by editing the "hw4-2017.Rmd" Rmarkdown file provided. Your solution to this homework assignment should include the relevant R code and output (fit summaries, ANOVA tables and computed statistics, as well as requested plots) in addition to written comments where requested. Do not include output that is not relevant to the question. 
+
+*You may discuss the homework problems and computing issues with other students in the class. However, you must write up your homework solution on your own. In particular, do not share your homework RMarkdown file with other students.*
+
+---
+### Question 1
+
+Here we will add one more deletion diagnostic to our arsenal. When comparing two possible models, we often want to ask "Does one predict *future data* better than the other?'' One way to do this is to divide your data into two collections of observations $(X_1,\mathbf y_1)$ and $(X_2,\mathbf y_2)$, say. We use $(X_1,\mathbf y_1)$ to obtain a linear regression model, with parameters $\hat{\mathbf \beta}$ and look at the *prediction error* $(\mathbf y_2 - X_2 \hat{\mathbf \beta})^T(\mathbf y_2 - X_2 \hat{\mathbf \beta})$.
+
+This is a bit wasteful -- you could use $(X_2,\mathbf y_2)$ to improve your estimate of $\hat{\mathbf \beta}$. However, we can assess how well this *type* of model does (for these data) as follows:
+
+
+- For each observation $i$
+  i. Remove $(\mathbf x_i,y_i)$ from the data and obtain $\hat{\mathbf \beta}_{(i)}$ from the remaining $n-1$ data points.
+
+  ii. Use this to make a prediction $\hat{y}_{(i)i} = \mathbf x_i^T \hat{\mathbf \beta}_{(i)}$.
+
+- Return the *cross validation* error $CV = \sum_{i=1}^n ( y_i - \hat{y}_{(i)i})^2$
+
+This can be used to compare a models that use different covariates, for example; particularly when the models are not nested. We will see an example of this in Question 2.
+
+Here, we will find a way to calculate $CV$ without having to manually go through removing observations one by one.
+
+
+a) Using the identity
+$$
+\hat{\mathbf \beta}_{(i)} = \hat{\mathbf \beta} - \frac{1}{1-h_{ii}} (X^TX)^{-1} \mathbf x_i \hat{e}_i
+$$
+from class, to obtain an expression for the *out of sample* prediction $\mathbf x_i^T \hat{\mathbf \beta}_{(i)}$ in terms of $\mathbf x_i$, $y_i$, $\hat{\mathbf \beta}$ and $h_{ii}$ only.
+
+
+b) Hence obtain an expression for the prediction error $y_i - \mathbf x_i^T \hat{\mathbf \beta}_{(i)}$ using only $y_i$, $\hat{y}_i$ and $h_{ii}$.  You may want to check this empirically using the first few entries of the hearth catherization data used in Question 2.
+
+c) Hence find an expression for CV in terms of the residuals $\hat{\mathbf e}$ obtained *without* deleting observations, and the leverages $h_{ii}$.
+
+
+
+### Question 2
+
+We will apply the formulae derived above to some real-world data. The file \texttt{NutritionStdy.csv} contains data on 314 patients undergoing elective surgery was collected to look at the relationship between the log-concentration of beta-carotene in the blood (\texttt{BetaPlasma}) and a number of personal characteristics and dietary factors.  We will consider the following five variables observed in this study as predictors for a MLR regression model with response \texttt{log(BetaPlasma)}:
+
+ - **Quetelet** the Quetelet index (Weight/Height$^2$).
+ - **Vitamin**  1 = regular, 2 = Occasionally, 3 = No
+ - **NumSmoke** Daily number of cigarettes smoked
+ - **Fiber** Grams of fiber consumed per day
+ - **BetaDiet** Dietary beta-carotene consumed per day
+
+
+Here we will examine the sequence of models produced by adding each co-variate in turn: ie first just \texttt{Quetelet}, then \texttt{Quetelet} and \texttt{Vitamin}, then \texttt{Quetelet} and \texttt{Vitamin} and \texttt{NumSmoke} etc. 
+
+When you do this, remember that \texttt{Vitamin} is a categorical covariate with three possible values, and will therefore use 2 columns of your $X$ matrix. To produce this, the \texttt{model.matrix} function might be useful. In particular, the following will produce the $X$ matrix for the whole-regression
+```{r,echo=TRUE}
+Nutrition = read.csv('NutritionStdy.csv')
+Nutrition$Vitamin = as.factor(Nutrition$Vitamin)
+X = model.matrix(log(BetaPlasma)~.,data=Nutrition)
+y = log(Nutrition$BetaPlasma)
+```
+The matrix \texttt{X} now contains the intercept as well as all the columns you need. You can obtain the matrix for just using \texttt{Quetelet} from \texttt{X[,1:2]}, for example. 
+
+a) First we will verify our cross validation formula using a small data set here:
+```{r,echo=TRUE}
+Xsmall = X[1:10,1:2]
+ysmall = y[1:10]
+```
+only uses the first 10 observations and just Quetelet.  
+
+Using these data, fit a model *without* using \texttt{y[10]} and \texttt{X[10,]} and use this model to predict \texttt{y[10]}. Confirm that you can use your formula from Question 1b to obtain this value from a model you fit with all 10 data points. 
+```{r}
+crossValidation = lm(ysmall[-10] ~ Xsmall[-10,2])
+yhat_10 = Xsmall[10,]%*%crossValidation$coefficients
+yhat_10
+hat_10 = Xsmall%*%solve(t(Xsmall)%*%Xsmall)%*%t(Xsmall)
+Q1b_yhat_10 = ysmall[10] - 1/(1-hat_10[10,10])*(ysmall[10]-hat_10[10,]%*%ysmall)
+Q1b_yhat_10
+```
+
+b) Now using the original data consider the sequence of 5 models described above. For each model obtain: 
+   i. MSE
+  ii. CV
+```{r}
+seq_1 = lm(y ~ X[,2])
+MSE_1 = mean(seq_1$residuals^2)
+MSE_1
+h_1 = diag(X[,2]%*%solve(t(X[,2])%*%X[,2])%*%t(X[,2]))
+CV_1 = sum((seq_1$residuals/(1-h_1))^2)
+CV_1
+```
+```{r}
+seq_2 = lm(y ~ X[,2:4])
+MSE_2 = mean(seq_2$residuals^2)
+MSE_2
+h_2 = diag(X[,2:4]%*%solve(t(X[,2:4])%*%X[,2:4])%*%t(X[,2:4]))
+CV_2 = sum((seq_2$residuals/(1-h_2))^2)
+CV_2
+```
+
+```{r}
+seq_3 = lm(y ~ X[,2:5])
+MSE_3 = mean(seq_3$residuals^2)
+MSE_3
+h_3 = diag(X[,2:5]%*%solve(t(X[,2:5])%*%X[,2:5])%*%t(X[,2:5]))
+CV_3 = sum((seq_3$residuals/(1-h_3))^2)
+CV_3
+```
+
+```{r}
+seq_4 = lm(y ~ X[,2:6])
+MSE_4 = mean(seq_4$residuals^2)
+MSE_4
+h_4 = diag(X[,2:6]%*%solve(t(X[,2:6])%*%X[,2:6])%*%t(X[,2:6]))
+CV_4 = sum((seq_4$residuals/(1-h_4))^2)
+CV_4
+```
+
+```{r}
+seq_5 = lm(y ~ X[,2:7])
+MSE_5 = mean(seq_5$residuals^2)
+MSE_5
+h_5 = diag(X[,2:7]%*%solve(t(X[,2:7])%*%X[,2:7])%*%t(X[,2:7]))
+CV_5 = sum((seq_5$residuals/(1-h_5))^2)
+CV_5
+```
+Report these values. Which model is chosen by minimizing CV? Does CV behave differently than MSE?  
+ 
+According to the result, the model with full covariates has the smallest CV and CV behaves the same as MSE.
+
+### Question 3
+
+Here we will turn to categorical covariates. In class, we saw that we may be interested in combinations of levels of a categorical covariate. We also saw that we can use a $t$-test to evaluate one combination; here we will examine multiple.
+
+We can generally express a *matrix* of contrasts $L$. For example, in a one-way design with four levels $A$, $B$, $C$, and $D$, the matrix
+$$
+L = \left( \begin{array}{cccc} 1 & -1 & 0 & 0 \\
+                               0 & 0 & -1 & 1 \end{array} \right)
+$$
+provides the contrasts $(\mu_A - \mu_B, \mu_D - \mu_C)$ and we might be interested in testing that $L {\mathbf \mu} = 0$ (i.e.  $\mu_A = \mu_B$ AND $\mu_C = \mu_D$).
+
+In this question, we will assume that the design is *balanced*, that is that there are an equal number, $n$ of observations in each level.
+
+a) In this question, we will use the *mean model* coding for our analysis (ie, set $\beta_0 = 0$ and use indicators for all four classes) so that $\mathbf \beta = \mathbf \mu$. Using this framework, what is the variance of $\hat{\mathbf \beta}$?  Express this in terms of numbers $n_{A}=\ldots=n_{D}=n$ of observations from each level.
+
+b) From the above result, what is the variance of $L \hat{\mathbf \beta}$?
+
+c) Using the expression above, show that $(L\hat{\mathbf \beta})^T \mbox{var}(L\hat{\mathbf \beta})^{-1} L\hat{\mathbf \beta}$ has a $\chi^2_2$ distribution.
+
+d) Why is $(L\hat{\mathbf \beta})^T \mbox{var}(L\hat{\mathbf \beta})^{-1} L\hat{\mathbf \beta}$ independent of MSE?
+
+e) Hence, find an $F$ statistic to test $H_0: L {\mathbf \mu} = 0$.
+
+f) Many analyses start by assuming that $L$ is orthonormal, $L L^T = I$. Why?
+
+
+### Question 4
+
+Lets apply contrasts to real-world data.  
+
+Here we will test some hypotheses about vitamin intake.
+
+
+a) Read the data in, making sure to specify that \texttt{Vitamin} is a factor and fit a linear model to predict \texttt{log(BetaPlasma)} from the remaining covariates. Extract the covariate matrix for this model using the \texttt{model.matrix} command in \texttt{R} with the output of the \texttt{lm} command as an argument.
+
+```{r,echo=TRUE}
+Nutrition = read.csv('NutritionStdy.csv')
+Vitamin = as.factor(Nutrition$Vitamin)
+lm_remain_cov = lm(log(Nutrition$BetaPlasma) ~ Nutrition$Quetelet 
+                   + Nutrition$NumSmoke + Vitamin + Nutrition$Fiber 
+                   + Nutrition$BetaDiet)
+X_remain_cov = model.matrix(lm_remain_cov)
+```
+
+b) Write down a matrix of contrasts applied to this covariate matrix to test the hypothesis that i) Levels 1 and 2 of Vitamin are the same,  and ii) that Level 3 is the same as the average of Levels 1 and 2.  Produce this matrix in \texttt{R}; simply producing the \texttt{R} code with some explanation will suffice.
+
+i) Testing the hypothesis i $$H_0 : \mu_1 = \mu_2$$ is equivalent to testing $$H_0 : \beta_2 = 0$$. 
+ii) Testing the hypothesis ii $$H_0 : \mu_3 = \frac{1}{2}(\mu_1 + \mu_2)$$ is equivalent to testing $$H_0 : \frac{1}{2}\beta_2 - \beta_3 = 0$$. 
+Therefore, the contrast matrix would be 
+$$
+L = \left( \begin{array}{ccccccc} 0 & 0 & 0 & 1 & 0 & 0 & 0\\
+                               0 & 0 & 0 & -\frac{1}{2} & 1 & 0 & 0\end{array} \right)
+$$
+```{r}
+L1 = c(rep(0,3), 1, rep(0,3))
+L2 = c(rep(0,3), -1/2, 1, rep(0,2))
+L = t(cbind(L1, L2))
+```
+
+c) What are the estimated values of the two contrasts defined in the previous part? Verify these values against the coefficients supplied by \texttt{lm} when you use the additional argument \texttt{contrasts = list(Vitamin = "contr.helmert")}. Your answers should be 2 and 3 times the coefficients for \texttt{Vitamin1} and \texttt{Vitamin2} respectively.  (**Bonus** explain why this is the case -- you will need to look up Helmert contrasts.)
+
+```{r}
+estimated_l = L%*%lm_remain_cov$coefficients
+estimated_l
+lm_new = lm(log(Nutrition$BetaPlasma) ~ Nutrition$Quetelet +
+              Nutrition$NumSmoke + Vitamin + Nutrition$Fiber 
+            + Nutrition$BetaDiet, contrasts = list(Vitamin = "contr.helmert"))
+mat_lm_new = model.matrix(lm_new)
+2*lm_new$coefficients[4]
+3*lm_new$coefficients[5]
+```
+
+
+d) Test this hypothesis using the formulae you derived in Question 3. Why does this not change the $F$ statistic that you get from the \texttt{Anova} function?
+
+```{r}
+Lbetahat = L%*%lm_remain_cov$coefficients
+XtX = t(X_remain_cov)%*%X_remain_cov
+iXtX = solve(XtX)
+LiXtXLt = L%*%iXtX%*%t(L)
+iLiXtXLt = solve(LiXtXLt)
+MSE = sum(lm_remain_cov$residuals^2)/307
+F_stats = t(Lbetahat)%*%iLiXtXLt%*%Lbetahat/(2*MSE)
+F_stats
+library(car)
+Anova(lm_remain_cov)
+```
+This is because Anova uses type II test and it does not include interactions when testing main effects.
+
+
